@@ -40,12 +40,12 @@ def makeBVFeature(PointCloud_, Discretization, bc):
 
     # Discretize Feature Map
     PointCloud = np.copy(PointCloud_)
-    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / Discretization))
+    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / Discretization) + Height / 2)
     PointCloud[:, 1] = np.int_(np.floor(PointCloud[:, 1] / Discretization) + Width / 2)
 
     # sort-3times
-    indices = np.lexsort((-PointCloud[:, 2], PointCloud[:, 1], PointCloud[:, 0]))
-    PointCloud = PointCloud[indices]
+    indices = np.lexsort((-PointCloud[:, 2], PointCloud[:, 1], PointCloud[:, 0]))   #ok
+    PointCloud = PointCloud[indices]    #ok
 
     # Height Map
     heightMap = np.zeros((Height, Width))
@@ -76,7 +76,7 @@ def makeBVFeature(PointCloud_, Discretization, bc):
     return RGB_Map
 
 
-def read_labels_for_bevbox(objects):
+def read_labels_for_bevbox(objects):# WORK IN PRGRESS 22/06
     bbox_selected = []
     for obj in objects:
         if obj.cls_id != -1:
@@ -94,10 +94,36 @@ def read_labels_for_bevbox(objects):
 
     return labels, noObjectLabels
 
+def read_labels_for_bevbox_ply(objects):# WORK IN PRGRESS 22/06
+    bbox_selected = []
+    for obj in objects:
+        if obj.cls_id != -1:
+            bbox = []
+            bbox.append(obj.cls_id)
+            # label list of shape x, y, z, h, w, l, ry
+            coord_list = obj.labels_bev
+            # TEST /!\ Y offset
+            # coord_list[1] = cnf.BEV_HEIGHT - coord_list[1]
+            bbox.extend(coord_list)
+            #
+            bbox_selected.append(bbox)
+            
+        else:
+            print('Removed  : {}'.format(obj.type))
+    if len(bbox_selected) == 0:
+        labels = np.zeros((1, 8), dtype=np.float32)
+        noObjectLabels = True
+    else:
+        labels = np.array(bbox_selected, dtype=np.float32)
+        noObjectLabels = False
+
+    return labels, noObjectLabels
+
 
 # bev image coordinates format
 def get_corners(x, y, w, l, yaw):
     bev_corners = np.zeros((4, 2), dtype=np.float32)
+    
     cos_yaw = np.cos(yaw)
     sin_yaw = np.sin(yaw)
     # front left
@@ -128,12 +154,12 @@ def build_yolo_target(labels):
         l = l + 0.3
         w = w + 0.3
         yaw = np.pi * 2 - yaw
-        if (bc["minX"] < x < bc["maxX"]) and (bc["minY"] < y < bc["maxY"]):
-            y1 = (y - bc["minY"]) / (bc["maxY"] - bc["minY"])  # we should put this in [0,1], so divide max_size  80 m
-            x1 = (x - bc["minX"]) / (bc["maxX"] - bc["minX"])  # we should put this in [0,1], so divide max_size  40 m
-            w1 = w / (bc["maxY"] - bc["minY"])
-            l1 = l / (bc["maxX"] - bc["minX"])
-            target.append([cl, y1, x1, w1, l1, math.sin(float(yaw)), math.cos(float(yaw))])
+        # if (bc["minX"] < x < bc["maxX"]) and (bc["minY"] < y < bc["maxY"]):
+        y1 = (y - bc["minY"]) / (bc["maxY"] - bc["minY"])  # we should put this in [0,1], so divide max_size  80 m
+        x1 = (x - bc["minX"]) / (bc["maxX"] - bc["minX"])  # we should put this in [0,1], so divide max_size  40 m
+        w1 = w / (bc["maxY"] - bc["minY"])
+        l1 = l / (bc["maxX"] - bc["minX"])
+        target.append([cl, y1, x1, w1, l1, math.sin(float(yaw)), math.cos(float(yaw))])
 
     return np.array(target, dtype=np.float32)
 
@@ -161,12 +187,13 @@ def inverse_yolo_target(targets, bc):
 
 # send parameters in bev image coordinates format
 def drawRotatedBox(img, x, y, w, l, yaw, color):
+    
     bev_corners = get_corners(x, y, w, l, yaw)
     corners_int = bev_corners.reshape(-1, 1, 2).astype(int)
     cv2.polylines(img, [corners_int], True, color, 2)
     corners_int = bev_corners.reshape(-1, 2)
     cv2.line(img, (corners_int[0, 0], corners_int[0, 1]), (corners_int[3, 0], corners_int[3, 1]), (255, 255, 0), 2)
-
+    pass
 
 def draw_box_in_bev(rgb_map, target):
     for j in range(50):

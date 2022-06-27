@@ -19,10 +19,13 @@ from torch.utils.data import Dataset
 import torch
 import torch.nn.functional as F
 import cv2
-
+# for pcd from poly reading 
+import open3d as o3d
+#   import etme to time during debugging
+import time
 sys.path.append('../')
 
-from data_process import transformation, kitti_bev_utils, kitti_data_utils
+from data_process import transformation, kitti_bev_utils, kitti_data_utils, ply_data_utils
 import config.kitti_config as cnf
 
 
@@ -53,6 +56,7 @@ class KittiDataset(Dataset):
         split_txt_path = os.path.join(self.dataset_dir, 'ImageSets', '{}.txt'.format(mode))
         self.image_idx_list = [x.strip() for x in open(split_txt_path).readlines()]
 
+        self.labels_list = self.read_all_label()
         if self.is_test:
             self.sample_id_list = [int(sample_id) for sample_id in self.image_idx_list]
         else:
@@ -84,27 +88,44 @@ class KittiDataset(Dataset):
 
         return img_file, rgb_map
 
+    def adjust_pointcloud(self, pcd_data):
+        # get the max value of pcd
+        range_pcd = np.amin(pcd_data) - np.amax(pcd_data)
+        # the max range multiplied is
+        pcd_ratio = ((50)/range_pcd)
+        new_pcd = pcd_ratio * pcd_data
+        # pcd_offset = new_pcd + abs(min(np.amin(new_pcd),0))
+        # print("What is the amax : {}".format(np.amax(pcd_offset)))
+        return new_pcd, pcd_ratio
+
     def load_img_with_targets(self, index):
         """Load images and targets for the training and validation phase"""
 
         sample_id = int(self.sample_id_list[index])
 
-        lidarData = self.get_lidar(sample_id)
-        objects = self.get_label(sample_id)
+        lidarData, pcd_ratio = self.get_ply(sample_id)
+        # To remove warning /!\/!\/!\/!\
+            # with open('test_poly_{}.txt'.format(sample_id), 'w') as f:
+            #     f.write(str(list(lidarData)))
+        # To remove warning /!\/!\/!\/!\
+        objects = self.get_label(sample_id, pcd_ratio=pcd_ratio)
         calib = self.get_calib(sample_id)
 
-        labels, noObjectLabels = kitti_bev_utils.read_labels_for_bevbox(objects)
+        labels, noObjectLabels = kitti_bev_utils.read_labels_for_bevbox_ply(objects)
 
         if not noObjectLabels:
-            labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0,
-                                                               calib.P)  # convert rect cam to velo cord
-
+            old_labels = np.array([[2,2],[3,3]])#transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0,
+                                  #                             calib.P)  # convert rect cam to velo cord
+                                                               # return a label of shape x, y, z, h, w, l, rz
+        # 
         if self.lidar_transforms is not None:
             lidarData, labels[:, 1:] = self.lidar_transforms(lidarData, labels[:, 1:])
 
-        b = kitti_bev_utils.removePoints(lidarData, cnf.boundary)
-        rgb_map = kitti_bev_utils.makeBVFeature(b, cnf.DISCRETIZATION, cnf.boundary)
-        target = kitti_bev_utils.build_yolo_target(labels)
+        # b = kitti_bev_utils.removePoints(lidarData, cnf.boundary)  # temporrary removed for testing purpose
+        rgb_map = kitti_bev_utils.makeBVFeature(lidarData, cnf.DISCRETIZATION, cnf.boundary)
+        # check fr the labels(5, 8)
+        
+        target = kitti_bev_utils.build_yolo_target(labels) 
         img_file = os.path.join(self.image_dir, '{:06d}.png'.format(sample_id))
 
         # on image space: targets are formatted as (box_idx, class, x, y, w, l, im, re)
@@ -134,6 +155,7 @@ class KittiDataset(Dataset):
 
         indices = [index] + [random.randint(0, self.num_samples - 1) for _ in range(3)]  # 3 additional image indices
         for i, index in enumerate(indices):
+            
             img_file, img, targets = self.load_img_with_targets(index)
             img_file_s4.append(img_file)
 
@@ -178,25 +200,28 @@ class KittiDataset(Dataset):
     def remove_invalid_idx(self, image_idx_list):
         """Discard samples which don't have current training class objects, which will not be used for training."""
 
+        print("---- remove invalid idx ----")
         sample_id_list = []
         for sample_id in image_idx_list:
             sample_id = int(sample_id)
-            objects = self.get_label(sample_id)
+            # missing ratio !!! /!\/!\/!\/!\
+            # /!\/!\/!\/!\/!\
+            objects = self.get_label(sample_id) # Get a list of 3D objects from data_utils
             calib = self.get_calib(sample_id)
-            labels, noObjectLabels = kitti_bev_utils.read_labels_for_bevbox(objects)
+            labels, noObjectLabels = kitti_bev_utils.read_labels_for_bevbox_ply(objects)
             if not noObjectLabels:
-                labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0,
-                                                                   calib.P)  # convert rect cam to velo cord
+                old_labels = np.array([[2,2],[3,3]])
+                # labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0,
+                #                                                    calib.P)  # convert rect cam to velo cord
+                                                                    # return a label of shape x, y, z, h, w, l, rz
 
             valid_list = []
             for i in range(labels.shape[0]):
-                if int(labels[i, 0]) in cnf.CLASS_NAME_TO_ID.values():
-                    if self.check_point_cloud_range(labels[i, 1:4]):
-                        valid_list.append(labels[i, 0])
-
+                if int(labels[i, 0]) in np.arange(0,len(self.labels_list)):    #cnf.CLASS_NAME_TO_ID.values():
+                    # if self.check_point_cloud_range(labels[i, 1:4]):
+                    valid_list.append(labels[i, 0])
             if len(valid_list) > 0:
                 sample_id_list.append(sample_id)
-
         return sample_id_list
 
     def check_point_cloud_range(self, xyz):
@@ -236,6 +261,21 @@ class KittiDataset(Dataset):
         img_file = os.path.join(self.image_dir, '{:06d}.png'.format(idx))
         # assert os.path.isfile(img_file)
         return cv2.imread(img_file)  # (H, W, C) -> (H, W, 3) OpenCV reads in BGR mode
+    
+    # Test for ply file reading
+    def get_ply(self, idx):
+        start = time.time()
+        # open ply file
+        poly_file = os.path.join(self.lidar_dir, '{:06d}.ply'.format(idx))
+        # read with open 3d as pooint cloud
+        pcd = o3d.io.read_point_cloud(poly_file)
+        # get the intensity channels
+        intensities = np.array(pcd.colors)
+        adjusted_pcd, pcd_ratio = self.adjust_pointcloud(np.array(pcd.points))
+        # fuse the intensity to the pcd xyz to obtain array of x, y, z, i 
+        pcd_reshaped = np.concatenate([adjusted_pcd, intensities[:, [0]]], axis=1)
+        # print('Pcd function took {} s'.format(round(time.time()-start,2)))
+        return np.array(pcd_reshaped, dtype=np.float32), pcd_ratio
 
     def get_lidar(self, idx):
         lidar_file = os.path.join(self.lidar_dir, '{:06d}.bin'.format(idx))
@@ -247,7 +287,16 @@ class KittiDataset(Dataset):
         # assert os.path.isfile(calib_file)
         return kitti_data_utils.Calibration(calib_file)
 
-    def get_label(self, idx):
+    def read_all_label(self):
+        label_file = os.path.join(self.label_dir, 'labels.txt')
+        # get all labels into a list
+        lines = [line.rstrip() for line in open(label_file)]
+        return lines
+
+    def get_label(self, idx, pcd_ratio=1):
         label_file = os.path.join(self.label_dir, '{:06d}.txt'.format(idx))
         # assert os.path.isfile(label_file)
-        return kitti_data_utils.read_label(label_file)
+        # new data utils file for 3D ply labeled in 3D space
+        # and not labeled in the camera frame
+        # return kitti_data_utils.read_label(label_file)
+        return ply_data_utils.read_label(label_file, labels_list=self.labels_list, multiplied_ratio=pcd_ratio)

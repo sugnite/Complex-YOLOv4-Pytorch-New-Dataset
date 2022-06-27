@@ -40,6 +40,7 @@ def create_train_dataloader(configs):
     train_sampler = None
     if configs.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        
     train_dataloader = DataLoader(train_dataset, batch_size=configs.batch_size, shuffle=(train_sampler is None),
                                   pin_memory=configs.pin_memory, num_workers=configs.num_workers, sampler=train_sampler,
                                   collate_fn=train_dataset.collate_fn)
@@ -140,7 +141,7 @@ if __name__ == '__main__':
         print('len val dataloader: {}'.format(len(dataloader)))
 
     print('\n\nPress n to see the next sample >>> Press Esc to quit...')
-
+    count_imgs = 0
     for batch_i, (img_files, imgs, targets) in enumerate(dataloader):
         if not (configs.mosaic and configs.show_train_data):
             img_file = img_files[0]
@@ -151,11 +152,15 @@ if __name__ == '__main__':
 
         # Rescale target
         targets[:, 2:6] *= configs.img_size
+        #
+
+        targets[:, 3] = targets[:, 3] + cnf.BEV_HEIGHT/2
         # Get yaw angle
         targets[:, 6] = torch.atan2(targets[:, 6], targets[:, 7])
 
         img_bev = imgs.squeeze() * 255
         img_bev = img_bev.permute(1, 2, 0).numpy().astype(np.uint8)
+        img_bev_sv = img_bev
         img_bev = cv2.resize(img_bev, (configs.img_size, configs.img_size))
 
         for c, x, y, w, l, yaw in targets[:, 1:7].numpy():
@@ -163,7 +168,8 @@ if __name__ == '__main__':
             bev_utils.drawRotatedBox(img_bev, x, y, w, l, yaw, cnf.colors[int(c)])
 
         img_bev = cv2.rotate(img_bev, cv2.ROTATE_180)
-
+      
+        # exit()
         if configs.mosaic and configs.show_train_data:
             if configs.save_img:
                 fn = os.path.basename(img_file)
@@ -176,8 +182,19 @@ if __name__ == '__main__':
                 fn = os.path.basename(img_file)
                 cv2.imwrite(os.path.join(configs.saved_dir, fn), out_img)
             else:
-                cv2.imshow('single_sample', out_img)
-
+                cv2.imshow('single_sample', img_bev)
+                # cv2.imwrite('../../../bv_{}.png'.format(count_imgs),img_bev)
+                # print('Image written')
+                count_imgs+=1
+                
+        
         if not configs.save_img:
-            if cv2.waitKey(0) & 0xff == 27:
-                break
+            k = 0
+            while k != 27 and k != 110:
+                k = cv2.waitKey(0)
+            if k==27:    # Esc key to stop
+                exit()
+      
+            # cv2.destroyAllWindows()
+            # exit()
+  
