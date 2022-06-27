@@ -1,14 +1,24 @@
 import numpy as np
+import os
+import sys
+from random import randrange
 
-class_list = ["Car", "Pedestrian", "Cyclist"]
+act_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+dataset_dir = os.path.join(act_path,'dataset','kitti')
+label_dir = os.path.join(dataset_dir, 'training', "label_2")
 
-CLASS_NAME_TO_ID = {
-    'Car': 0,
-    'Pedestrian': 1,
-    'Cyclist': 2,
-    'Van': 0,
-    'Person_sitting': 1,
-}
+# For more scalable file, import labels if not already done 
+label_file = os.path.join(label_dir, 'labels.txt')
+# get all labels into a list
+class_list = [line.rstrip() for line in open(label_file)]
+
+# get label correspondance
+CLASS_NAME_TO_ID = {}
+# get a color list for all labels
+colors = []
+for cnt, classes in enumerate(class_list):
+    CLASS_NAME_TO_ID[classes] = cnt
+    colors.append([randrange(20,255),randrange(50,255),randrange(200,255)])
 
 # Front side (of vehicle) Point Cloud boundary for BEV
 boundary = {
@@ -35,7 +45,7 @@ BEV_HEIGHT = 608  # across x axis 0m ~ 50m
 
 DISCRETIZATION = (boundary["maxX"] - boundary["minX"]) / BEV_HEIGHT
 
-colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0]]
+# colors = [[0, 255, 255], [0, 0, 255], [255, 0, 0]]
 
 # Following parameters are calculated as an average from KITTI dataset for simplicity
 #####################################################################################
