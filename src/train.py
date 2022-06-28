@@ -129,9 +129,7 @@ def main_worker(gpu_idx, configs):
     train_dataloader, train_sampler = create_train_dataloader(configs)
     if logger is not None:
         logger.info('number of batches in training set: {}'.format(len(train_dataloader)))
-    # /!\ /!\ /!\ /!\ /!\ 
-    exit()
-    # /!\ /!\ /!\ /!\ /!\
+
     if configs.evaluate:
         val_dataloader = create_val_dataloader(configs)
         precision, recall, AP, f1, ap_class = evaluate_mAP(val_dataloader, model, configs, None)

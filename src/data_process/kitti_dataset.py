@@ -200,7 +200,6 @@ class KittiDataset(Dataset):
     def remove_invalid_idx(self, image_idx_list):
         """Discard samples which don't have current training class objects, which will not be used for training."""
 
-        print("---- remove invalid idx ----")
         sample_id_list = []
         for sample_id in image_idx_list:
             sample_id = int(sample_id)
