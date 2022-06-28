@@ -5,10 +5,10 @@ from random import randrange
 
 act_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 dataset_dir = os.path.join(act_path,'dataset','kitti')
-label_dir = os.path.join(dataset_dir, 'training', "label_2")
+label_dir = dataset_dir
 
 # For more scalable file, import labels if not already done 
-label_file = os.path.join(label_dir, 'labels.txt')
+label_file = os.path.join(label_dir, 'classes_names.txt')
 # get all labels into a list
 class_list = [line.rstrip() for line in open(label_file)]
 

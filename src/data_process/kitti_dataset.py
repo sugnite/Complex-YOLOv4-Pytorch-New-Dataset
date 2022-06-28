@@ -288,7 +288,7 @@ class KittiDataset(Dataset):
         return kitti_data_utils.Calibration(calib_file)
 
     def read_all_label(self):
-        label_file = os.path.join(self.label_dir, 'labels.txt')
+        label_file = os.path.join(self.dataset_dir, 'classes_names.txt')
         # get all labels into a list
         lines = [line.rstrip() for line in open(label_file)]
         return lines
