@@ -16,7 +16,6 @@ import config.kitti_config as cnf
 
 
 def removePoints(PointCloud, BoundaryCond):
-    # Boundary condition
     minX = BoundaryCond['minX']
     maxX = BoundaryCond['maxX']
     minY = BoundaryCond['minY']
@@ -35,12 +34,13 @@ def removePoints(PointCloud, BoundaryCond):
 
 
 def makeBVFeature(PointCloud_, Discretization, bc):
+
     Height = cnf.BEV_HEIGHT + 1
     Width = cnf.BEV_WIDTH + 1
 
     # Discretize Feature Map
     PointCloud = np.copy(PointCloud_)
-    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / Discretization) + Height / 2)
+    PointCloud[:, 0] = np.int_(np.floor(PointCloud[:, 0] / Discretization))
     PointCloud[:, 1] = np.int_(np.floor(PointCloud[:, 1] / Discretization) + Width / 2)
 
     # sort-3times
