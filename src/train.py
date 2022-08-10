@@ -82,8 +82,8 @@ def main_worker(gpu_idx, configs):
         logger = None
         tb_writer = None
 
-    # model
-    model = create_model(configs)
+    # Add model the model to the device (caused a problem when running the trainning process with original model)
+    model = create_model(configs).to(configs.device)
 
     # load weight from a checkpoint
     if configs.pretrained_path is not None:
@@ -101,10 +101,9 @@ def main_worker(gpu_idx, configs):
 
     # Data Parallel
 
-    # --- LINE TO RESTORE ---
-    # model = make_data_parallel(model, configs)
-    # --- LINE TO RESTORE ---
 
+    model = make_data_parallel(model, configs)
+    
     # Make sure to create optimizer after moving the model to cuda
     optimizer = create_optimizer(configs, model)
     lr_scheduler = create_lr_scheduler(optimizer, configs)
