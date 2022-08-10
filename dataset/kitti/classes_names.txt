@@ -1,3 +1,11 @@
-Car
-Pedestrian
-Cyclist
+stairs
+door
+chair
+desk
+desktop
+monitor
+table
+trash_bin
+laptop
+sofa
+cart
