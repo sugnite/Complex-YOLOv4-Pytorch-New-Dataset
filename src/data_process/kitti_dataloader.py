@@ -117,6 +117,8 @@ if __name__ == '__main__':
                         help='If true, random padding if using mosaic augmentation')
     parser.add_argument('--show-train-data', action='store_true',
                         help='If true, random padding if using mosaic augmentation')
+    parser.add_argument('--debuggs', action='store_true',
+                        help='If true, don t show imgs just debugg')
     parser.add_argument('--output-width', type=int, default=608,
                         help='the width of showing output, the height maybe vary')
     parser.add_argument('--save_img', action='store_true',
@@ -152,9 +154,6 @@ if __name__ == '__main__':
 
         # Rescale target
         targets[:, 2:6] *= configs.img_size
-        #
-
-        targets[:, 3] = targets[:, 3] + cnf.BEV_HEIGHT/2
         # Get yaw angle
         targets[:, 6] = torch.atan2(targets[:, 6], targets[:, 7])
 
@@ -162,14 +161,12 @@ if __name__ == '__main__':
         img_bev = img_bev.permute(1, 2, 0).numpy().astype(np.uint8)
         img_bev_sv = img_bev
         img_bev = cv2.resize(img_bev, (configs.img_size, configs.img_size))
-
         for c, x, y, w, l, yaw in targets[:, 1:7].numpy():
             # Draw rotated box
             bev_utils.drawRotatedBox(img_bev, x, y, w, l, yaw, cnf.colors[int(c)])
 
         img_bev = cv2.rotate(img_bev, cv2.ROTATE_180)
       
-        # exit()
         if configs.mosaic and configs.show_train_data:
             if configs.save_img:
                 fn = os.path.basename(img_file)
@@ -182,19 +179,20 @@ if __name__ == '__main__':
                 fn = os.path.basename(img_file)
                 cv2.imwrite(os.path.join(configs.saved_dir, fn), out_img)
             else:
-                cv2.imshow('single_sample', img_bev)
-                # cv2.imwrite('../../../bv_{}.png'.format(count_imgs),img_bev)
-                # print('Image written')
+                if not configs.debuggs:
+                    cv2.imshow('single_sample', img_bev)
                 count_imgs+=1
+                print('\nMoving to image',count_imgs)
                 
         
         if not configs.save_img:
-            k = 0
-            while k != 27 and k != 110:
-                k = cv2.waitKey(0)
-            if k==27:    # Esc key to stop
-                exit()
+            if not configs.debuggs:
+                k = 0
+                while k != 27 and k != 110:
+                    k = cv2.waitKey(0)
+                if k==27:    # Esc key to stop
+                    exit()
+            pass
       
             # cv2.destroyAllWindows()
             # exit()
-  
