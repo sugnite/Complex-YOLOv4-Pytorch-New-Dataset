@@ -1,11 +1,19 @@
 # Complex YOLOv4
 
+---
+## Scalable to New Datasets
+    [Updated 29/06/22]
+    The network and dataloader as been modified to allow any .ply file as an LiDAR.
+    All data labeled with labelcloud software are readable by the newtork to do object recognition using Point Cloud Data.
+---
+
 [![python-image]][python-url]
 [![pytorch-image]][pytorch-url]
 
 The PyTorch Implementation based on YOLOv4 of the paper: [Complex-YOLO: Real-time 3D Object Detection on Point Clouds](https://arxiv.org/pdf/1803.06199.pdf)
-
 ---
+
+
 
 ## Features
 - [x] Realtime 3D object detection based on YOLOv4
@@ -227,24 +235,24 @@ ${ROOT}
 └── src/
     ├── config/
     ├── cfg/
-        │   ├── complex_yolov3.cfg
-        │   ├── complex_yolov3_tiny.cfg
-        │   ├── complex_yolov4.cfg
-        │   ├── complex_yolov4_tiny.cfg
-    │   ├── train_config.py
-    │   └── kitti_config.py
+        │   ├── complex_yolov3.cfg
+        │   ├── complex_yolov3_tiny.cfg
+        │   ├── complex_yolov4.cfg
+        │   ├── complex_yolov4_tiny.cfg
+    │   ├── train_config.py
+    │   └── kitti_config.py
     ├── data_process/
-    │   ├── kitti_bev_utils.py
-    │   ├── kitti_dataloader.py
-    │   ├── kitti_dataset.py
-    │   ├── kitti_data_utils.py
-    │   ├── train_val_split.py
-    │   └── transformation.py
+    │   ├── kitti_bev_utils.py
+    │   ├── kitti_dataloader.py
+    │   ├── kitti_dataset.py
+    │   ├── kitti_data_utils.py
+    │   ├── train_val_split.py
+    │   └── transformation.py
     ├── models/
-    │   ├── darknet2pytorch.py
-    │   ├── darknet_utils.py
-    │   ├── model_utils.py
-    │   ├── yolo_layer.py
+    │   ├── darknet2pytorch.py
+    │   ├── darknet_utils.py
+    │   ├── model_utils.py
+    │   ├── yolo_layer.py
     └── utils/
     │   ├── evaluation_utils.py
     │   ├── iou_utils.py
@@ -363,3 +371,4 @@ optional arguments:
 [python-url]: https://www.python.org/
 [pytorch-image]: https://img.shields.io/badge/PyTorch-1.5-2BAF2B.svg
 [pytorch-url]: https://pytorch.org/
+
