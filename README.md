@@ -3,14 +3,15 @@
 ---
 ## Scalable to New Datasets
 [Updated 29/06/22]
-The network and dataloader as been modified to allow any .ply file as an LiDAR.
-All data labeled with labelcloud software are readable by the newtork to do object recognition using Point Cloud Data.
+The network and dataloader have been modified to allow any .ply file as a LiDAR data.
+All data labeled with labelcloud software are readable by the newtork to do object recognition using Point Cloud Data only.
+No conversion as been made from RGB camera visualisation 
 
 ## 1. Getting Started with new dataset
 
 ### 1.1. Requirement
 
-We need gdown to download the dataset
+Gdown is required to download the dataset
 
 ```shell script
 pip install gdown
@@ -28,15 +29,28 @@ gdown https://drive.google.com/uc?id=1rvB7KyuHdSWhPTXDOYeWw5dOeEKesNUC
 To run this program follow all the standards instruction
 
 ## 3. Add new trained data
-
+### 3.1 Label conversion
 To add new trained data, a labelcloud convert is available.
-download [`labelcloud`](https://github.com/ch-sa/labelCloud) and put the file labelcloud/convert_labels.py in the master folder
+Download [`labelcloud`](https://github.com/ch-sa/labelCloud) and put the file labelcloud/convert_labels.py in the master folder
 
 To convert the json label to kitti format run :
 
 ```shell script
 python convert_labels.py
 ```
+
+Replace the new classes_name.txt file in the dataset folder or add new labels to the old one.
+
+### 3.2 Label conversion
+
+The filenames have to be added in kitti/ImageSets
+
+### 3.3 Resize Network
+
+The configs file has to be modified to change
+- classes=number of classes
+Change the filter of the second last layer to match new classes:
+- ( classes + 6 + 1 ) * 3 
 ---
 [![python-image]][python-url]
 [![pytorch-image]][pytorch-url]
