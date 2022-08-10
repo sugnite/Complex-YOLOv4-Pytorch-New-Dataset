@@ -88,41 +88,24 @@ class KittiDataset(Dataset):
 
         return img_file, rgb_map
 
-    def adjust_pointcloud(self, pcd_data):
-        # get the max value of pcd
-        range_pcd = np.amin(pcd_data) - np.amax(pcd_data)
-        # the max range multiplied is
-        pcd_ratio = ((50)/range_pcd)
-        new_pcd = pcd_ratio * pcd_data
-        # pcd_offset = new_pcd + abs(min(np.amin(new_pcd),0))
-        # print("What is the amax : {}".format(np.amax(pcd_offset)))
-        return new_pcd, pcd_ratio
+   
 
     def load_img_with_targets(self, index):
         """Load images and targets for the training and validation phase"""
 
         sample_id = int(self.sample_id_list[index])
-
-        lidarData, pcd_ratio = self.get_ply(sample_id)
-        # To remove warning /!\/!\/!\/!\
-            # with open('test_poly_{}.txt'.format(sample_id), 'w') as f:
-            #     f.write(str(list(lidarData)))
-        # To remove warning /!\/!\/!\/!\
-        objects = self.get_label(sample_id, pcd_ratio=pcd_ratio)
+        lidarData, pcd_ratio_vars = self.get_ply(sample_id)
+        objects = self.get_label(sample_id, pcd_ratio=pcd_ratio_vars)
         calib = self.get_calib(sample_id)
-
         labels, noObjectLabels = kitti_bev_utils.read_labels_for_bevbox_ply(objects)
 
         if not noObjectLabels:
             old_labels = np.array([[2,2],[3,3]])#transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0,
                                   #                             calib.P)  # convert rect cam to velo cord
                                                                # return a label of shape x, y, z, h, w, l, rz
-        # 
-        if self.lidar_transforms is not None:
-            lidarData, labels[:, 1:] = self.lidar_transforms(lidarData, labels[:, 1:])
 
-        # b = kitti_bev_utils.removePoints(lidarData, cnf.boundary)  # temporrary removed for testing purpose
-        rgb_map = kitti_bev_utils.makeBVFeature(lidarData, cnf.DISCRETIZATION, cnf.boundary)
+        b = kitti_bev_utils.removePoints(lidarData, cnf.boundary)  # temporrary removed for testing purpose
+        rgb_map = kitti_bev_utils.makeBVFeature(b, cnf.DISCRETIZATION, cnf.boundary)
         # check fr the labels(5, 8)
         
         target = kitti_bev_utils.build_yolo_target(labels) 
@@ -203,13 +186,14 @@ class KittiDataset(Dataset):
         sample_id_list = []
         for sample_id in image_idx_list:
             sample_id = int(sample_id)
-            # missing ratio !!! /!\/!\/!\/!\
-            # /!\/!\/!\/!\/!\
             objects = self.get_label(sample_id) # Get a list of 3D objects from data_utils
-            calib = self.get_calib(sample_id)
+            # Not used in purely 3D point cloud based training
+            # calib = self.get_calib(sample_id)
             labels, noObjectLabels = kitti_bev_utils.read_labels_for_bevbox_ply(objects)
             if not noObjectLabels:
                 old_labels = np.array([[2,2],[3,3]])
+                """not used because we don't have any camera data as the new
+                   dataset is purely 3D based """
                 # labels[:, 1:] = transformation.camera_to_lidar_box(labels[:, 1:], calib.V2C, calib.R0,
                 #                                                    calib.P)  # convert rect cam to velo cord
                                                                     # return a label of shape x, y, z, h, w, l, rz
@@ -260,8 +244,45 @@ class KittiDataset(Dataset):
         img_file = os.path.join(self.image_dir, '{:06d}.png'.format(idx))
         # assert os.path.isfile(img_file)
         return cv2.imread(img_file)  # (H, W, C) -> (H, W, 3) OpenCV reads in BGR mode
-    
-    # Test for ply file reading
+
+    def adjust_pointcloud(self, pcd_data):
+        # get the max value of pcd
+        x_range = [cnf.boundary["minX"], cnf.boundary["maxX"]]
+        y_range = [cnf.boundary["minY"], cnf.boundary["maxY"]]
+        z_range = [cnf.boundary["minZ"], cnf.boundary["maxZ"]]
+
+        range_pcd_x = [np.amin(pcd_data[:,0]), np.amax(pcd_data[:,0])]
+        range_pcd_y = [np.amin(pcd_data[:,1]), np.amax(pcd_data[:,1])]
+        min_pcd_z = np.amin(pcd_data[:,2])
+
+        # the max range multiplied is
+        max_range = np.min([x_range[1] - x_range[0], y_range[1] - y_range[0]])
+        pcd_ratio = ((max_range)/np.amax([range_pcd_x[1] - range_pcd_x[0], 
+                                          range_pcd_y[1] - range_pcd_y[0]]))
+        # resize the x, y bypassing the z later
+        new_pcd = pcd_ratio * pcd_data
+
+        # calculate offset
+        x_offset = x_range[0] - np.amin(new_pcd[:,0])
+        y_offset = y_range[0] - np.amin(new_pcd[:,1]) 
+        z_offset = z_range[0] - min_pcd_z
+
+        # offset x, y (and z bypassing the ratio)
+        new_pcd[:,0] = new_pcd[:,0] + x_offset
+        new_pcd[:,1] = new_pcd[:,1] + y_offset
+        new_pcd[:,2] = pcd_data[:,2] + z_offset
+
+        range_pcd_x = [np.amin(new_pcd[:,0]), np.amax(new_pcd[:,0])]
+        range_pcd_y = [np.amin(new_pcd[:,1]), np.amax(new_pcd[:,1])]
+        range_pcd_z = [np.amin(new_pcd[:,2]), np.amax(new_pcd[:,2])]
+        print('X range ', range_pcd_x)
+        print('Y range ', range_pcd_y)
+        print('Z range ', range_pcd_z)
+
+        pcd_ratio_var = [pcd_ratio, x_offset, y_offset, z_offset]
+        return new_pcd, pcd_ratio_var
+
+    # Function to import Ply file as a scan
     def get_ply(self, idx):
         start = time.time()
         # open ply file
@@ -270,11 +291,11 @@ class KittiDataset(Dataset):
         pcd = o3d.io.read_point_cloud(poly_file)
         # get the intensity channels
         intensities = np.array(pcd.colors)
-        adjusted_pcd, pcd_ratio = self.adjust_pointcloud(np.array(pcd.points))
+        adjusted_pcd, pcd_ratio_vars = self.adjust_pointcloud(np.array(pcd.points))
         # fuse the intensity to the pcd xyz to obtain array of x, y, z, i 
         pcd_reshaped = np.concatenate([adjusted_pcd, intensities[:, [0]]], axis=1)
         # print('Pcd function took {} s'.format(round(time.time()-start,2)))
-        return np.array(pcd_reshaped, dtype=np.float32), pcd_ratio
+        return np.array(pcd_reshaped, dtype=np.float32), pcd_ratio_vars
 
     def get_lidar(self, idx):
         lidar_file = os.path.join(self.lidar_dir, '{:06d}.bin'.format(idx))
@@ -292,10 +313,10 @@ class KittiDataset(Dataset):
         lines = [line.rstrip() for line in open(label_file)]
         return lines
 
-    def get_label(self, idx, pcd_ratio=1):
+    def get_label(self, idx, pcd_ratio=[1,0,0,0]):
         label_file = os.path.join(self.label_dir, '{:06d}.txt'.format(idx))
         # assert os.path.isfile(label_file)
         # new data utils file for 3D ply labeled in 3D space
         # and not labeled in the camera frame
         # return kitti_data_utils.read_label(label_file)
-        return ply_data_utils.read_label(label_file, labels_list=self.labels_list, multiplied_ratio=pcd_ratio)
+        return ply_data_utils.read_label(label_file, labels_list=self.labels_list, pcd_ratio=pcd_ratio)
