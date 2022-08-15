@@ -16,9 +16,11 @@ Gdown is required to download the dataset
 ```shell script
 pip install gdown
 ```
-### 1.2. Dowbload the new Dataset
+### 1.2. Download the new Dataset
 
 Download the new made dataset
+
+![dataset](./docs/complex_dataset.jpg)
 
 ```shell script
 gdown https://drive.google.com/uc?id=1rvB7KyuHdSWhPTXDOYeWw5dOeEKesNUC
